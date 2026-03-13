@@ -1,0 +1,1157 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 8179703b59d04f3694e2da5ac97e8353
+      template: 'Proxmox by Linux Zabbix agent'
+      name: 'Proxmox by Linux Zabbix agent'
+      description: |
+        This template was created for a full monitoring of Proxmox VE hosts with the Linux Zabbix agent. It includes items for monitoring the state of Proxmox services, cluster quorum, and general system performance metrics. The template is designed to be used with Zabbix 7.4 and may require adjustments for other versions.
+        
+        This template was made by: Jannik Hegemann
+      groups:
+        - name: Templates
+      items:
+        - uuid: 8c65c028f349465fa92b87a4490af814
+          name: 'Host name of Zabbix agent running'
+          key: agent.hostname
+          delay: 1h
+          value_type: CHAR
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: system
+        - uuid: 66f55540fc4247d08caab96b23656a07
+          name: 'Zabbix agent ping'
+          key: agent.ping
+          description: 'The agent always returns "1" for this item. May be used in combination with `nodata()` for the availability check.'
+          tags:
+            - tag: component
+              value: system
+        - uuid: 5f36e7e6d7c24e5e8ca6a9a53857b036
+          name: 'Version of Zabbix agent running'
+          key: agent.version
+          delay: 1h
+          value_type: CHAR
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: application
+        - uuid: 84b77bb4cf4c4fb4a02feb4865733ee5
+          name: 'ICMP ping'
+          type: SIMPLE
+          key: icmpping
+          delay: 20s
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: icmp
+            - tag: component
+              value: system
+          triggers:
+            - uuid: ad85bda25416494e9806c91283ebb1ca
+              expression: 'last(/Proxmox by Linux Zabbix agent/icmpping,#3)=0'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/icmpping,#3)=1'
+              name: 'Host is down.'
+              priority: DISASTER
+              description: 'The last 3 icmp pings has been 0(DOWN)'
+              tags:
+                - tag: scope
+                  value: availability
+        - uuid: 3c5508402c1c4d909a25a3c4cba82b49
+          name: 'Maximum number of open file descriptors'
+          key: kernel.maxfiles
+          delay: 1h
+          description: 'May be increased by using the `sysctl` utility or modifying the file `/etc/sysctl.conf`.'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: system
+        - uuid: 20b2d73a43d64503af373afc884f618d
+          name: 'Maximum number of processes'
+          key: kernel.maxproc
+          delay: 1h
+          description: 'May be increased by using the `sysctl` utility or modifying the file `/etc/sysctl.conf`.'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 1fbbcf27495542e89622c54298db3b60
+              expression: 'last(/Proxmox by Linux Zabbix agent/kernel.maxproc)<1024'
+              name: 'Linux: Configured max number of processes is too low'
+              event_name: 'Linux: Configured max number of processes is too low (< {$KERNEL.MAXPROC.MIN})'
+              priority: INFO
+              dependencies:
+                - name: 'Linux: Getting closer to process limit'
+                  expression: 'last(/Proxmox by Linux Zabbix agent/proc.num)/last(/Proxmox by Linux Zabbix agent/kernel.maxproc)*100>80'
+              tags:
+                - tag: scope
+                  value: performance
+        - uuid: ef1acb8477284fe9864667eb8764e5bf
+          name: 'Number of processes'
+          key: proc.num
+          tags:
+            - tag: component
+              value: system
+        - uuid: 8d072056e0db435ea8197be8cd3fad64
+          name: 'Number of running processes'
+          key: 'proc.num[,,run]'
+          tags:
+            - tag: component
+              value: system
+        - uuid: fb48e14f1dc64e868f717e0abd0e5c27
+          name: 'Quorum State'
+          key: proxmox.quorum.status
+          description: 'State of quorum from cluster'
+          valuemap:
+            name: 'Service State (OK/UNHEALTHY)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 6472280b4f7b46168c1fc30edec7f04b
+              expression: 'last(/Proxmox by Linux Zabbix agent/proxmox.quorum.status,#3)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/proxmox.quorum.status,#3)=1'
+              name: 'Proxmox: Quorum is unhealthy'
+              priority: HIGH
+        - uuid: bac866571c554f549dfd7bd8b68809b6
+          name: 'Service State(Cluster): corosync.service'
+          key: 'pve.service.state["corosync"]'
+          delay: 20s
+          trends: '0'
+          description: corosync.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 3d8ba9fde5544794a7a8ae15b8f4e9fd
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["corosync"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["corosync"],#3:now)=1'
+              name: 'Proxmox(Cluster): corosync.service is not running'
+              priority: DISASTER
+        - uuid: c7b14a9c1c6744f89eb967a29bc183aa
+          name: 'Service State: ksmtuned.service'
+          key: 'pve.service.state["ksmtuned"]'
+          delay: 20s
+          trends: '0'
+          description: ksmtuned.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 0219abe5c56e470aa4516b8e3c33263c
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["ksmtuned"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["ksmtuned"],#3:now)=1'
+              name: 'Proxmox: ksmtuned.service is not running'
+              priority: WARNING
+        - uuid: 2ada697750b14ae28cfff8b423b62464
+          name: 'Service State: lxcfs.service'
+          key: 'pve.service.state["lxcfs"]'
+          delay: 20s
+          trends: '0'
+          description: lxcfs.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: cfb22e9a8d42418b84d74edf37baa23d
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["lxcfs"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["lxcfs"],#3:now)=1'
+              name: 'Proxmox: lxcfs.service is not running'
+              priority: WARNING
+        - uuid: 8fe73234da9a43d295d6cd893dea942b
+          name: 'Service State(Cluster): pve-cluster.service'
+          key: 'pve.service.state["pve-cluster"]'
+          delay: 20s
+          trends: '0'
+          description: pve-cluster.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: e4be8dd2a93747358f9b85e2f1e074b3
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-cluster"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-cluster"],#3:now)=1'
+              name: 'Proxmox(Cluster): pve-cluster.service is not running'
+              priority: DISASTER
+        - uuid: c137739a707242a79740abf160294164
+          name: 'Service State(Firewall): pve-firewall.service'
+          key: 'pve.service.state["pve-firewall"]'
+          delay: 20s
+          trends: '0'
+          description: pve-firewall.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 954dac73f7e940d4b85bfb66ce126cda
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-firewall"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-firewall"],#3:now)=1'
+              name: 'Proxmox(Firewall): pve-firewall.service is not running'
+              priority: HIGH
+        - uuid: d0ea09ce55e7405abba699a004680273
+          name: 'Service State(HA): pve-ha-crm.service'
+          key: 'pve.service.state["pve-ha-crm"]'
+          delay: 20s
+          trends: '0'
+          description: pve-ha-crm.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: ffde1e6cabc64fbca82e607c1d856050
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-ha-crm"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-ha-crm"],#3:now)=1'
+              name: 'Proxmox(HA): pve-ha-crm.service is not running'
+              priority: HIGH
+        - uuid: 2d3d1a778d854ded98c0f296e2567d87
+          name: 'Service State(HA): pve-ha-lrm.service'
+          key: 'pve.service.state["pve-ha-lrm"]'
+          delay: 20s
+          trends: '0'
+          description: pve-ha-lrm.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 8d2f06da875446c3afee3700913c9807
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-ha-lrm"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pve-ha-lrm"],#3:now)=1'
+              name: 'Proxmox(HA): pve-ha-lrm.service is not running'
+              priority: HIGH
+        - uuid: c4bd5dc947774106be692ad4f6555b96
+          name: 'Service State(Management): pvedaemon.service'
+          key: 'pve.service.state["pvedaemon"]'
+          delay: 20s
+          trends: '0'
+          description: pvedaemon.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 2c921c90f35b40798f87e854b0e27e2b
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvedaemon"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvedaemon"],#3:now)=1'
+              name: 'Proxmox(Management): pvedaemon.service is not running'
+              priority: HIGH
+        - uuid: 8792cc13319f4e7c87aea5a97ebc239e
+          name: 'Service State: pvefw-logger.service'
+          key: 'pve.service.state["pvefw-logger"]'
+          delay: 20s
+          trends: '0'
+          description: pvefw-logger.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 983c7adf210a40d28a2ba19177cd7981
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvefw-logger"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvefw-logger"],#3:now)=1'
+              name: 'Proxmox: pvefw-logger.service is not running'
+              priority: INFO
+        - uuid: b5b927055ae44f0e9b5a39a812509bc0
+          name: 'Service State(Management): pveproxy.service'
+          key: 'pve.service.state["pveproxy"]'
+          delay: 20s
+          trends: '0'
+          description: pveproxy.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: a36adbf7f6264b21ba646709f412bb11
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pveproxy"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pveproxy"],#3:now)=1'
+              name: 'Proxmox(Management): pveproxy.service is not running'
+              priority: HIGH
+        - uuid: b965d804774c4c399d4c08aa0f1ecd56
+          name: 'Service State: pvescheduler.service'
+          key: 'pve.service.state["pvescheduler"]'
+          delay: 20s
+          trends: '0'
+          description: pvescheduler.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: b73b3be7440241f5a81b9f08ad26eaa0
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvescheduler"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvescheduler"],#3:now)=1'
+              name: 'Proxmox: pvescheduler.service is not running'
+              priority: AVERAGE
+        - uuid: 5e6992a5cf24431494ba707a2007b549
+          name: 'Service State(Management): pvestatd.service'
+          key: 'pve.service.state["pvestatd"]'
+          delay: 20s
+          trends: '0'
+          description: pvestatd.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 754629abda50436ea4aab70b29de8d42
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvestatd"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["pvestatd"],#3:now)=1'
+              name: 'Proxmox(Management): pvestatd.service is not running'
+              priority: HIGH
+        - uuid: 60c7e6f49f924a998de43ea23b10f11a
+          name: 'Service State: qmeventd.service'
+          key: 'pve.service.state["qmeventd"]'
+          delay: 20s
+          trends: '0'
+          description: qmeventd.service
+          valuemap:
+            name: 'Service State (UP/DOWN)'
+          tags:
+            - tag: component
+              value: proxmox
+            - tag: component
+              value: service
+          triggers:
+            - uuid: 2e146846d79d44aaaa0717cafd7239c2
+              expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["qmeventd"],#3:now)<>1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox by Linux Zabbix agent/pve.service.state["qmeventd"],#3:now)=1'
+              name: 'Proxmox: qmeventd.service is not running'
+              priority: AVERAGE
+        - uuid: e06fa4d5b6f34775aa7422fcd114f7aa
+          name: 'System boot time'
+          key: system.boottime
+          delay: 15m
+          units: unixtime
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+        - uuid: 3149fdc18aa94c698b275c99b283baf9
+          name: 'Interrupts per second'
+          key: system.cpu.intr
+          value_type: FLOAT
+          description: 'Number of interrupts processed.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 4cae4d30a8d34b5f9fb1db15b8dde632
+          name: 'Load average (1m avg)'
+          key: 'system.cpu.load[all,avg1]'
+          value_type: FLOAT
+          description: 'Calculated as the system CPU load divided by the number of CPU cores.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 8722af5d22df4cfeadfcc26e22c25e9b
+          name: 'Load average (5m avg)'
+          key: 'system.cpu.load[all,avg5]'
+          value_type: FLOAT
+          description: 'Calculated as the system CPU load divided by the number of CPU cores.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 2fff46805b5e4d5296095972db2dbfce
+          name: 'Load average (15m avg)'
+          key: 'system.cpu.load[all,avg15]'
+          value_type: FLOAT
+          description: 'Calculated as the system CPU load divided by the number of CPU cores.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 1a656177436440339f672a25b3a6f645
+          name: 'Number of CPUs'
+          key: system.cpu.num
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 52cd9e350b6541c198ca3cb1044f8676
+          name: 'CPU utilization'
+          type: DEPENDENT
+          key: system.cpu.util
+          value_type: FLOAT
+          units: '%'
+          description: 'CPU utilization expressed in %.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - 'return (100 - value)'
+          master_item:
+            key: 'system.cpu.util[,idle]'
+          tags:
+            - tag: component
+              value: cpu
+          triggers:
+            - uuid: 02782917606e47f09acd27e305b5ca9e
+              expression: 'min(/Proxmox by Linux Zabbix agent/system.cpu.util,5m)>90'
+              name: 'Linux: High CPU utilization'
+              event_name: 'Linux: High CPU utilization (over 90% for 5m)'
+              opdata: 'Current utilization: {ITEM.LASTVALUE1}'
+              priority: HIGH
+              description: 'CPU utilization is too high. The system might be slow to respond.'
+              dependencies:
+                - name: 'Linux: Load average is too high'
+                  expression: |
+                    min(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg1],5m)/last(/Proxmox by Linux Zabbix agent/system.cpu.num)>1.5
+                    and last(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg5])>0
+                    and last(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg15])>0
+              tags:
+                - tag: scope
+                  value: performance
+        - uuid: 83668e3d03754af386b4e9c23e5aeb32
+          name: 'CPU guest time'
+          key: 'system.cpu.util[,guest]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time spent on running a virtual CPU for a guest operating system.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 82fc537929614eb98eba4d6f6b78515e
+          name: 'CPU guest nice time'
+          key: 'system.cpu.util[,guest_nice]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time spent on running a niced guest (a virtual CPU for guest operating systems under the control of the Linux kernel).'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 9403d740c2bc48b1a6d77067b41fdd6b
+          name: 'CPU idle time'
+          key: 'system.cpu.util[,idle]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has spent doing nothing.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: b81743aeac8f4e1f85bd57b6b59a9db5
+          name: 'CPU interrupt time'
+          key: 'system.cpu.util[,interrupt]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has spent servicing hardware interrupts.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: cc9b0dbc61e145439f85f33564faf39e
+          name: 'CPU iowait time'
+          key: 'system.cpu.util[,iowait]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has been waiting for I/O to complete.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 5a7a726d0c204de6ab16d7b56488487b
+          name: 'CPU nice time'
+          key: 'system.cpu.util[,nice]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has spent running users'' processes that have been niced.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: fe2e59a529b54930bae4f36c448e8fa7
+          name: 'CPU softirq time'
+          key: 'system.cpu.util[,softirq]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has been servicing software interrupts.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: d70ccf49dee84ea096f928ea60a8459d
+          name: 'CPU steal time'
+          key: 'system.cpu.util[,steal]'
+          value_type: FLOAT
+          units: '%'
+          description: 'The amount of "stolen" CPU from this virtual machine by the hypervisor for other tasks, such as running another virtual machine.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 2e00ed5fab9b4f0789e38cf410bf0c5d
+          name: 'CPU system time'
+          key: 'system.cpu.util[,system]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has spent running the kernel and its processes.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 6949cd65547d4046a3eb2221daa75b56
+          name: 'CPU user time'
+          key: 'system.cpu.util[,user]'
+          value_type: FLOAT
+          units: '%'
+          description: 'Time the CPU has spent running users'' processes that are not niced.'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: ca766183267d4c539cdd7702af0cef5b
+          name: 'System name'
+          key: system.hostname
+          delay: 1h
+          value_type: CHAR
+          description: 'The host name of the system.'
+          inventory_link: NAME
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 12h
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 19ea67c7621a480fb702032519d6c2c6
+              expression: 'change(/Proxmox by Linux Zabbix agent/system.hostname) and length(last(/Proxmox by Linux Zabbix agent/system.hostname))>0'
+              name: 'Linux: System name has changed'
+              event_name: 'Linux: System name has changed (new name: {ITEM.VALUE})'
+              priority: INFO
+              description: 'The name of the system has changed. Acknowledge to close the problem manually.'
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: notice
+                - tag: scope
+                  value: security
+        - uuid: e85ea158b1d24f2dac3253154809b88f
+          name: 'System local time'
+          key: system.localtime
+          units: unixtime
+          description: 'The local system time of the host.'
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 7c8ba37a688242f88d3a0c1c2a86e566
+              expression: 'fuzzytime(/Proxmox by Linux Zabbix agent/system.localtime,60s)=0'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'fuzzytime(/Proxmox by Linux Zabbix agent/system.localtime,10s)=1'
+              name: 'Linux: System time is out of sync'
+              event_name: 'Linux: System time is out of sync (diff with Zabbix server > {$SYSTEM.FUZZYTIME.MAX})'
+              priority: WARNING
+              description: 'The host''s system time is different from Zabbix server time.'
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: availability
+                - tag: scope
+                  value: performance
+        - uuid: eea0a856590d4c49b51dbf8d3f85b12e
+          name: 'Operating system architecture'
+          key: system.sw.arch
+          delay: 1h
+          value_type: CHAR
+          description: 'The architecture of the operating system.'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: os
+        - uuid: 975c4816ebf84adebc8feda51fae1587
+          name: 'Operating system'
+          key: system.sw.os
+          delay: 1h
+          value_type: CHAR
+          inventory_link: OS
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          tags:
+            - tag: component
+              value: os
+          triggers:
+            - uuid: 6f2c247cc6d9483db8076b42cd129bff
+              expression: 'change(/Proxmox by Linux Zabbix agent/system.sw.os) and length(last(/Proxmox by Linux Zabbix agent/system.sw.os))>0'
+              name: 'Linux: Operating system description has changed'
+              priority: INFO
+              description: 'The description of the operating system has changed. Possible reasons are that the system has been updated or replaced. Acknowledge to close the problem manually.'
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Linux: System name has changed'
+                  expression: 'change(/Proxmox by Linux Zabbix agent/system.hostname) and length(last(/Proxmox by Linux Zabbix agent/system.hostname))>0'
+              tags:
+                - tag: scope
+                  value: notice
+        - uuid: 48275757a4bd47c7b0806d1f6e09d35a
+          name: 'Free swap space'
+          key: 'system.swap.size[,free]'
+          units: B
+          description: 'The free space of the swap volume/file expressed in bytes.'
+          tags:
+            - tag: component
+              value: memory
+            - tag: component
+              value: storage
+        - uuid: 8a8e1a6e2f4e47a89fb165127e26a7db
+          name: 'Free swap space in %'
+          key: 'system.swap.size[,pfree]'
+          value_type: FLOAT
+          units: '%'
+          description: 'The free space of the swap volume/file expressed in %.'
+          tags:
+            - tag: component
+              value: memory
+            - tag: component
+              value: storage
+        - uuid: b95cbea88f7c4b5db8198bc21a8c5bde
+          name: 'Total swap space'
+          key: 'system.swap.size[,total]'
+          units: B
+          description: 'The total space of the swap volume/file expressed in bytes.'
+          tags:
+            - tag: component
+              value: memory
+            - tag: component
+              value: storage
+        - uuid: 2889a2f015da454ab418eaf503aa55b5
+          name: 'System description'
+          key: system.uname
+          delay: 15m
+          value_type: CHAR
+          description: 'The information as normally returned by `uname -a`.'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 12h
+          tags:
+            - tag: component
+              value: system
+        - uuid: e60f6a77926a4bc5b766d689c784562b
+          name: 'System uptime'
+          key: system.uptime
+          delay: 30s
+          trends: '0'
+          units: uptime
+          description: 'The system uptime expressed in the following format: "N days, hh:mm:ss".'
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 206c6d24966d47c39444acbf0e0cb62e
+              expression: 'last(/Proxmox by Linux Zabbix agent/system.uptime)<10m'
+              name: 'Linux: {HOST.NAME} has been restarted'
+              event_name: 'Linux: {HOST.NAME} has been restarted (uptime < 10m)'
+              priority: WARNING
+              description: 'The host uptime is less than 10 minutes.'
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: notice
+        - uuid: ab8e6faaf0ea4903983f4e0d139450df
+          name: 'Available memory'
+          key: 'vm.memory.size[available]'
+          units: B
+          description: |
+            The available memory:
+            - in Linux = free + buffers + cache;
+            - on other platforms calculation may vary.
+            
+            See also Appendixes in Zabbix Documentation about parameters of the `vm.memory.size` item.
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 568e277042d249318cc9cc4bdd8008b4
+          name: 'Available memory in %'
+          key: 'vm.memory.size[pavailable]'
+          value_type: FLOAT
+          units: '%'
+          description: 'The available memory as percentage of the total. See also Appendixes in Zabbix Documentation about parameters of the `vm.memory.size` item.'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 4e2cea46deec45498396312ab7c7fa6b
+          name: 'Total memory'
+          key: 'vm.memory.size[total]'
+          units: B
+          description: 'Total memory expressed in bytes.'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: c772254fb5f0467d8e5216925cb07212
+          name: 'Memory utilization'
+          type: DEPENDENT
+          key: vm.memory.utilization
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of used memory is calculated as `100-pavailable`.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - 'return (100-value);'
+          master_item:
+            key: 'vm.memory.size[pavailable]'
+          tags:
+            - tag: component
+              value: memory
+          triggers:
+            - uuid: 44471edda79947a7896037432231b83d
+              expression: 'min(/Proxmox by Linux Zabbix agent/vm.memory.utilization,5m)>90'
+              name: 'Linux: High memory utilization'
+              event_name: 'Linux: High memory utilization (>90% for 5m)'
+              priority: HIGH
+              description: 'The system is running out of free memory.'
+              dependencies:
+                - name: 'Linux: Lack of available memory'
+                  expression: 'max(/Proxmox by Linux Zabbix agent/vm.memory.size[available],5m)<20M and last(/Proxmox by Linux Zabbix agent/vm.memory.size[total])>0'
+              tags:
+                - tag: scope
+                  value: capacity
+                - tag: scope
+                  value: performance
+        - uuid: 4d47920d1f034cb4a92aaf033d46aa38
+          name: 'Zabbix agent availability'
+          type: INTERNAL
+          key: 'zabbix[host,agent,available]'
+          description: 'Used for monitoring the availability status of the agent.'
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 33cfeae0930549fbbb9aa3fc39e4cc0d
+              expression: 'max(/Proxmox by Linux Zabbix agent/zabbix[host,agent,available],3m)=0'
+              name: 'Zabbix agent is not available'
+              event_name: 'Zabbix agent is not available (for 3m)'
+              priority: AVERAGE
+              description: 'For passive agents only, host availability is used with 3m as a time threshold.'
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: availability
+      discovery_rules:
+        - uuid: eb1f9aed3e26401299f201ab034f8bcb
+          name: 'LVM-Storage Discovery'
+          key: pve.storage.discovery
+          delay: 1h
+          item_prototypes:
+            - uuid: 21922fd14a174fc6a1a9b2da1d4b7b44
+              name: 'Storage {#STORAGE_NAME}: Used space in %'
+              key: 'pve.storage.pused["{#STORAGE_NAME}"]'
+              units: '%'
+              tags:
+                - tag: component
+                  value: lvm-storage
+                - tag: component
+                  value: proxmox
+            - uuid: a70f35a8f3d242559b54ac03aa755f66
+              name: 'Storage {#STORAGE_NAME}: Total space'
+              key: 'pve.storage.total.gb["{#STORAGE_NAME}"]'
+              delay: 20s
+              units: GB
+              tags:
+                - tag: component
+                  value: lvm-storage
+                - tag: component
+                  value: proxmox
+            - uuid: 51c568993bfa48448331b79375f1368f
+              name: 'Storage {#STORAGE_NAME}: Used space'
+              key: 'pve.storage.used.gb["{#STORAGE_NAME}"]'
+              units: GB
+              tags:
+                - tag: component
+                  value: lvm-storage
+                - tag: component
+                  value: proxmox
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var lines = value.split('\n');
+                  var output = [];
+                  for (var i = 0; i < lines.length; i++) {
+                  	if (lines[i].trim() !== "") {
+                  		output.push({ "{#STORAGE_NAME}": lines[i].trim() });
+                  	}
+                  }
+                  return JSON.stringify(output);
+      tags:
+        - tag: class
+          value: os
+        - tag: target
+          value: linux
+        - tag: target
+          value: proxmox
+      dashboards:
+        - uuid: 2edd43dc670e4473baa2e145127d8a2e
+          name: 'Proxmox Status'
+          pages:
+            - name: Systemstatus
+              widgets:
+                - type: honeycomb
+                  name: 'State of quorum'
+                  width: '8'
+                  height: '3'
+                  fields:
+                    - type: STRING
+                      name: items.0
+                      value: 'Quorum State'
+                    - type: STRING
+                      name: reference
+                      value: LGFVB
+                    - type: STRING
+                      name: thresholds.0.color
+                      value: E65660
+                    - type: STRING
+                      name: thresholds.0.threshold
+                      value: '0'
+                    - type: STRING
+                      name: thresholds.1.color
+                      value: 3BC97D
+                    - type: STRING
+                      name: thresholds.1.threshold
+                      value: '1'
+                - type: gauge
+                  'y': '3'
+                  width: '8'
+                  height: '4'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Proxmox by Linux Zabbix agent'
+                        key: vm.memory.utilization
+                    - type: STRING
+                      name: max
+                      value: '100'
+                    - type: STRING
+                      name: min
+                      value: '0'
+                - type: problems
+                  'y': '7'
+                  width: '72'
+                  height: '5'
+                  fields:
+                    - type: STRING
+                      name: reference
+                      value: RQYSQ
+                - type: hostcard
+                  x: '8'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: sections.0
+                      value: '3'
+                    - type: INTEGER
+                      name: sections.1
+                      value: '4'
+                - type: gauge
+                  x: '8'
+                  'y': '3'
+                  width: '9'
+                  height: '4'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Proxmox by Linux Zabbix agent'
+                        key: system.cpu.util
+                    - type: STRING
+                      name: max
+                      value: '100'
+                    - type: STRING
+                      name: min
+                      value: '0'
+                - type: honeycomb
+                  x: '20'
+                  width: '13'
+                  height: '3'
+                  fields:
+                    - type: STRING
+                      name: items.0
+                      value: 'System uptime'
+                    - type: STRING
+                      name: items.1
+                      value: 'ICMP ping'
+                    - type: STRING
+                      name: reference
+                      value: YSGKV
+                - type: honeycomb
+                  x: '33'
+                  width: '39'
+                  height: '3'
+                  fields:
+                    - type: STRING
+                      name: items.0
+                      value: 'Service State(Cluster): corosync.service'
+                    - type: STRING
+                      name: items.1
+                      value: 'Service State(Cluster): pve-cluster.service'
+                    - type: STRING
+                      name: items.2
+                      value: 'Service State(Firewall): pve-firewall.service'
+                    - type: STRING
+                      name: items.3
+                      value: 'Service State(HA): pve-ha-crm.service'
+                    - type: STRING
+                      name: items.4
+                      value: 'Service State(HA): pve-ha-lrm.service'
+                    - type: STRING
+                      name: items.5
+                      value: 'Service State(Management): pvedaemon.service'
+                    - type: STRING
+                      name: items.6
+                      value: 'Service State(Management): pveproxy.service'
+                    - type: STRING
+                      name: items.7
+                      value: 'Service State(Management): pvestatd.service'
+                    - type: STRING
+                      name: items.8
+                      value: 'Service State: ksmtuned.service'
+                    - type: STRING
+                      name: items.9
+                      value: 'Service State: lxcfs.service'
+                    - type: STRING
+                      name: items.10
+                      value: 'Service State: pvefw-logger.service'
+                    - type: STRING
+                      name: items.11
+                      value: 'Service State: pvescheduler.service'
+                    - type: STRING
+                      name: items.12
+                      value: 'Service State: qmeventd.service'
+                    - type: STRING
+                      name: primary_label
+                      value: '{ITEM.DESCRIPTION}'
+                    - type: STRING
+                      name: reference
+                      value: TWLEU
+                    - type: STRING
+                      name: thresholds.0.color
+                      value: E65660
+                    - type: STRING
+                      name: thresholds.0.threshold
+                      value: '0'
+                    - type: STRING
+                      name: thresholds.1.color
+                      value: 3BC97D
+                    - type: STRING
+                      name: thresholds.1.threshold
+                      value: '1'
+                - type: svggraph
+                  x: '33'
+                  'y': '3'
+                  width: '20'
+                  height: '4'
+                  fields:
+                    - type: INTEGER
+                      name: ds.0.color_palette
+                      value: '0'
+                    - type: STRING
+                      name: ds.0.items.0
+                      value: 'CPU guest nice time'
+                    - type: STRING
+                      name: ds.0.items.1
+                      value: 'CPU guest time'
+                    - type: STRING
+                      name: ds.0.items.2
+                      value: 'CPU idle time'
+                    - type: STRING
+                      name: ds.0.items.3
+                      value: 'CPU interrupt time'
+                    - type: STRING
+                      name: ds.0.items.4
+                      value: 'CPU iowait time'
+                    - type: STRING
+                      name: ds.0.items.5
+                      value: 'CPU nice time'
+                    - type: STRING
+                      name: ds.0.items.6
+                      value: 'CPU softirq time'
+                    - type: STRING
+                      name: ds.0.items.7
+                      value: 'CPU steal time'
+                    - type: STRING
+                      name: ds.0.items.8
+                      value: 'CPU system time'
+                    - type: STRING
+                      name: ds.0.items.9
+                      value: 'CPU user time'
+                    - type: STRING
+                      name: ds.0.items.10
+                      value: 'CPU utilization'
+                    - type: STRING
+                      name: reference
+                      value: RYEVV
+                    - type: INTEGER
+                      name: righty
+                      value: '0'
+                - type: svggraph
+                  x: '53'
+                  'y': '3'
+                  width: '19'
+                  height: '4'
+                  fields:
+                    - type: INTEGER
+                      name: ds.0.color_palette
+                      value: '0'
+                    - type: STRING
+                      name: ds.0.items.0
+                      value: '* Total space'
+                    - type: STRING
+                      name: ds.0.items.1
+                      value: '* Used space'
+                    - type: STRING
+                      name: reference
+                      value: KZEAY
+                    - type: INTEGER
+                      name: righty
+                      value: '0'
+      valuemaps:
+        - uuid: 3767ff3e281e4d718c0cd72766a9c469
+          name: 'Service State (OK/UNHEALTHY)'
+          mappings:
+            - value: '1'
+              newvalue: OK
+            - type: DEFAULT
+              newvalue: UNHEALTHY
+        - uuid: e427ac3ab1564215979ca4c0fe84c6bb
+          name: 'Service State (UP/DOWN)'
+          mappings:
+            - value: '1'
+              newvalue: UP
+            - value: '0'
+              newvalue: DOWN
+            - type: DEFAULT
+              newvalue: Unknown
+  triggers:
+    - uuid: df0a69f506844399b94a4c78a84c4158
+      expression: 'last(/Proxmox by Linux Zabbix agent/proc.num)/last(/Proxmox by Linux Zabbix agent/kernel.maxproc)*100>80'
+      name: 'Linux: Getting closer to process limit'
+      event_name: 'Linux: Getting closer to process limit (over 80% used)'
+      opdata: '{ITEM.LASTVALUE1} active, {ITEM.LASTVALUE2} limit.'
+      priority: WARNING
+      tags:
+        - tag: scope
+          value: performance
+    - uuid: 61a4774582034d4db12de4971078f3c1
+      expression: 'max(/Proxmox by Linux Zabbix agent/system.swap.size[,pfree],5m)<80 and last(/Proxmox by Linux Zabbix agent/system.swap.size[,total])>0'
+      name: 'Linux: High swap space usage'
+      event_name: 'Linux: High swap space usage (less than 80% free)'
+      opdata: 'Free: {ITEM.LASTVALUE1}, total: {ITEM.LASTVALUE2}'
+      priority: WARNING
+      description: 'If there is no swap configured, this trigger is ignored.'
+      dependencies:
+        - name: 'Linux: High memory utilization'
+          expression: 'min(/Proxmox by Linux Zabbix agent/vm.memory.utilization,5m)>90'
+        - name: 'Linux: Lack of available memory'
+          expression: 'max(/Proxmox by Linux Zabbix agent/vm.memory.size[available],5m)<20M and last(/Proxmox by Linux Zabbix agent/vm.memory.size[total])>0'
+      tags:
+        - tag: scope
+          value: capacity
+    - uuid: f958c1f8abe545668153510ff56ecf70
+      expression: 'max(/Proxmox by Linux Zabbix agent/vm.memory.size[available],5m)<20M and last(/Proxmox by Linux Zabbix agent/vm.memory.size[total])>0'
+      name: 'Linux: Lack of available memory'
+      event_name: 'Linux: Lack of available memory (<{$MEMORY.AVAILABLE.MIN} of {ITEM.VALUE2})'
+      opdata: 'Available: {ITEM.LASTVALUE1}, total: {ITEM.LASTVALUE2}'
+      priority: AVERAGE
+      description: 'The system is running out of memory.'
+      tags:
+        - tag: scope
+          value: capacity
+        - tag: scope
+          value: performance
+    - uuid: 285bf55ebb58421da024818537b2eb13
+      expression: |
+        min(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg1],5m)/last(/Proxmox by Linux Zabbix agent/system.cpu.num)>1.5
+        and last(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg5])>0
+        and last(/Proxmox by Linux Zabbix agent/system.cpu.load[all,avg15])>0
+      name: 'Linux: Load average is too high'
+      event_name: 'Linux: Load average is too high (per CPU load over {$LOAD_AVG_PER_CPU.MAX.WARN} for 5m)'
+      opdata: 'Load averages(1m 5m 15m): ({ITEM.LASTVALUE1} {ITEM.LASTVALUE3} {ITEM.LASTVALUE4}), # of CPUs: {ITEM.LASTVALUE2}'
+      priority: AVERAGE
+      description: 'The load average per CPU is too high. The system may be slow to respond.'
+      tags:
+        - tag: scope
+          value: capacity
+        - tag: scope
+          value: performance
