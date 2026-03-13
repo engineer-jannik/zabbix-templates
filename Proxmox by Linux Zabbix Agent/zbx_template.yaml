@@ -1185,6 +1185,25 @@ zabbix_export:
                     - type: STRING
                       name: min
                       value: '0'
+                - type: svggraph
+                  name: 'Network Usage'
+                  x: '17'
+                  'y': '3'
+                  width: '16'
+                  height: '4'
+                  fields:
+                    - type: INTEGER
+                      name: ds.0.color_palette
+                      value: '0'
+                    - type: STRING
+                      name: ds.0.items.0
+                      value: 'Interface*'
+                    - type: STRING
+                      name: reference
+                      value: JBSDO
+                    - type: INTEGER
+                      name: righty
+                      value: '0'
                 - type: honeycomb
                   x: '20'
                   width: '13'
@@ -1262,6 +1281,7 @@ zabbix_export:
                       name: thresholds.1.threshold
                       value: '1'
                 - type: svggraph
+                  name: 'CPU Usage'
                   x: '33'
                   'y': '3'
                   width: '20'
@@ -1310,6 +1330,7 @@ zabbix_export:
                       name: righty
                       value: '0'
                 - type: svggraph
+                  name: 'Storage Usage'
                   x: '53'
                   'y': '3'
                   width: '19'
