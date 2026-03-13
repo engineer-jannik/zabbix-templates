@@ -10,6 +10,7 @@ zabbix_export:
       description: |
         This template was created for a full monitoring of Proxmox VE hosts with the Linux Zabbix agent. It includes items for monitoring the state of Proxmox services, cluster quorum, and general system performance metrics. The template is designed to be used with Zabbix 7.4 and may require adjustments for other versions.
         
+        Please read https://github.com/engineer-jannik/zabbix-templates/tree/main/Proxmox%20by%20Linux%20Zabbix%20Agent to install the template right.
         This template was made by: Jannik Hegemann
       groups:
         - name: Templates
